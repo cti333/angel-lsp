@@ -1,0 +1,65 @@
+name: Build and Package (XCK)
+
+on:
+  push:
+    branches: [ "master", "main" ]
+  pull_request:
+    branches: [ "master", "main" ]
+  workflow_dispatch: # 允许手动点击触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 关键步骤：修改 package.json 以避免与原版插件冲突
+      - name: Customize Extension ID
+        run: |
+          sed -i 's/"name": "angel-lsp"/"name": "angel-lsp-xck"/g' package.json
+          sed -i 's/"displayName": "Angel-LSP"/"displayName": "Angel-LSP (XCK-Fork)"/g' package.json
+          # 如果你想修改发布者，也可以取消下面这一行的注释
+          # sed -i 's/"publisher": ".*"/"publisher": "cti333"/g' package.json
+
+      - name: Compile Project
+        run: npm run compile
+
+      - name: Test (server)
+        run: npm test --prefix server --if-present
+
+      # 步骤 1：生成 .vsix 安装包
+      - name: Package VSIX
+        if: ${{ success() }}
+        run: npx --yes @vscode/vsce package --no-dependencies
+
+      # 步骤 2：整理并打包编译后的原始文件 (.zip)
+      - name: Create ZIP Archive
+        if: ${{ success() }}
+        run: |
+          mkdir -p xck_dist
+          # 复制编译输出（通常在 out 目录）
+          [ -d "server/out" ] && cp -r server/out xck_dist/server_out
+          [ -d "client/out" ] && cp -r client/out xck_dist/client_out
+          cp package.json xck_dist/
+          # 压缩
+          zip -r angel-lsp-xck-raw.zip xck_dist/
+
+      # 步骤 3：上传所有产物（包含 .vsix 和 .zip）
+      - name: Upload Artifacts
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: angel-lsp-xck-builds
+          path: |
+            *.vsix
+            angel-lsp-xck-raw.zip

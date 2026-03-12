@@ -44,6 +44,12 @@ let s_hasWorkspaceDiagnosticsRefreshCapability = false;
 
 let s_hasDiagnosticRelatedInformationCapability = false;
 
+// 打印当前进程的内存限制（单位：MB）
+const v8 = require('v8');
+const heapStats = v8.getHeapStatistics();
+const limitConfigured = (heapStats.heap_size_limit / 1024 / 1024).toFixed(2);
+console.log(`[AngelScript Server] Current Heap Limit: ${limitConfigured} MB`);
+
 s_connection.onInitialize((params: lsp.InitializeParams) => {
     const capabilities = params.capabilities;
 
